@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "note": "Index of field captures — no raw video/audio committed (see data/raw/ ignored). Add entries after each Kondele walk per data/capture-checklist.md.",
+  "captures": [
+    {
+      "id": "2026-10-30-kon #1-stub",
+      "date": "2026-10-30",
+      "session": "A-day-stub",
+      "route": "A→B→C",
+      "video": "data/raw/2026-10-30-A.mp4 (not committed, 0 MB stub)",
+      "gpsTrace": "data/trace-2026-10-30-A.json",
+      "framesLabeled": 0,
+      "entrancesTested": ["Kondele market — 0/3 frames (stub)"],
+      "status": "stub — replace with real Kondele walk on 2510DRA23E"
+    }
+  ]
+}

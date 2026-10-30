@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "note": "GPS trace stub — replay via src/routing/simulator.ts. Real trace from 2510DRA23E chest mount will replace this.",
+  "device": "2510DRA23E Android 16",
+  "route": "A→B→C Kondele",
+  "points": [
+    { "lat": -0.0919, "lon": 34.7675, "accuracy": 8, "heading": 62 },
+    { "lat": -0.0917, "lon": 34.7678, "accuracy": 7, "heading": 62 },
+    { "lat": -0.0916, "lon": 34.7680, "accuracy": 6, "heading": 45 },
+    { "lat": -0.09145, "lon": 34.76825, "accuracy": 7, "heading": 45 },
+    { "lat": -0.0913, "lon": 34.7685, "accuracy": 8, "heading": 45 }
+  ]
+}

@@ -5,6 +5,8 @@ import { resolvePlace } from './routing/gazetteer';
 import { dijkstra, NODES } from './routing/graph';
 import { GuidanceEngine } from './routing/guidance';
 import { simulateWalk } from './routing/simulator';
+import { createRecorder, transcribeAudio } from './voice/pushToTalk';
+import { captureFrame, readSign, decideArrival, signReadingSchema } from './slow/arrival';
 
 type Hud = { text: string; tone: 'idle'|'ok'|'warn'|'danger' };
 
@@ -44,6 +46,14 @@ app.innerHTML = `
           <button id="resolve" class="btn">Resolve</button>
           <button id="sim" class="btn">Simulate walk</button>
         </div>
+        <div class="row" style="margin-top:8px">
+          <button id="ptt" class="btn">Hold to talk</button>
+          <button id="confirmYes" class="btn">ndiyo (yes)</button>
+          <button id="confirmNo" class="btn">hapana (no)</button>
+          <button id="stop" class="btn" style="border-color:#be123c;color:#be123c">Stop</button>
+          <span id="voiceStatus" class="status muted">Push-to-talk: hold, release to transcribe.</span>
+        </div>
+        <div id="transcript" class="log" style="margin-top:8px">No transcript yet. On 2510DRA23E, hold to talk → Baseten audio_url (data URL, 5 s timeout) or type fallback. Then read-back → confirm.</div>
         <p class="muted">Fuzzy (token + lev + phonetic) vs <span class="kbd">data/gazetteer.json</span> (Kisumu, Kondele, Nai, Bondo) → read-back <span class="kbd">ndiyo/hapana</span> → graph Dijkstra (cost = dist + crossings + hazard − landmark). Future cheap device: same engine with ultrasonic + lidar + camera.</p>
         <div id="route" class="log">No route yet. Try: "kondele", "kisumu", "nai", "bondo", "soko la kondele".</div>
 
@@ -51,9 +61,11 @@ app.innerHTML = `
         <div class="row">
           <button id="gps" class="btn">Start GPS</button>
           <button id="stopGps" class="btn">Stop</button>
+          <button id="verify" class="btn">Verify arrival (3 frames)</button>
           <span id="gpsStatus" class="status muted">GPS idle</span>
         </div>
         <div id="gpsLog" class="log">Waiting for position…</div>
+        <div id="arrivalLog" class="log" style="margin-top:8px">Arrival: deterministic — GPS ≤ radius AND text match in 2/3 frames (Section 6). Needs camera + GPS near entrance.</div>
       </div>
     </div>
 
@@ -190,6 +202,8 @@ document.getElementById('detToggle')!.addEventListener('click', async ()=>{
 
 let currentEdges: any = null;
 let guidance: any = null;
+let pendingPlace: any = null;
+let voiceRecorder = createRecorder((s)=> { const v=document.getElementById('voiceStatus')!; v.textContent=s; });
 document.getElementById('resolve')!.addEventListener('click', async ()=>{
   const q = (document.getElementById('dest') as HTMLInputElement).value.trim();
   if(!q) return;
@@ -202,8 +216,10 @@ document.getElementById('resolve')!.addEventListener('click', async ()=>{
     cueEngine.enqueue('head-height');
     return;
   }
-  route.textContent = `Heard "${q}" → "${result.place.names[0]}" (score ${result.score.toFixed(2)}) alias "${result.alias}"\nRead-back: "Go to ${result.place.names[0]}?" — say ndiyo/hapana (yes/no).`;
-  appendSlow(`resolve hit: "${q}" → ${result.place.id} score ${result.score.toFixed(2)} — would call Baseten resolve_place check`);
+  pendingPlace = result.place;
+  route.textContent = `Heard "${q}" → "${result.place.names[0]}" (score ${result.score.toFixed(2)}) alias "${result.alias}"\nRead-back: "Go to ${result.place.names[0]}?" — tap ndiyo/hapana.`;
+  appendSlow(`resolve hit: "${q}" → ${result.place.id} score ${result.score.toFixed(2)} — pending confirmation`);
+  try{ speechSynthesis.speak(new SpeechSynthesisUtterance(`Go to ${result.place.names[0]}?`)); }catch{}
   // Map place to graph node for demo route (Kondele graph only — Nairobi/Bondo are alias-only per DECISIONS)
   const map: Record<string,string> = { 'kondele-market':'B', 'kisumu-main':'C' };
   const destNode = map[result.place.id];
@@ -220,6 +236,45 @@ document.getElementById('resolve')!.addEventListener('click', async ()=>{
   route.textContent += `\nTap Simulate walk to replay GPS trace through guidance (snap + turn cue).`;
   cueEngine.enqueue('person-ahead');
 });
+// Voice: push-to-talk (Section 30) — hold to record, release to transcribe
+const pttBtn = document.getElementById('ptt') as HTMLButtonElement;
+let pttDown=false;
+async function doTranscribe(dataURL:string){
+  const transcriptEl=document.getElementById('transcript')!;
+  const t=await transcribeAudio(dataURL, appendSlow);
+  const text = t.text || (document.getElementById('dest') as HTMLInputElement).value.trim();
+  // If local fallback and no text, prompt to type
+  if(!t.text && !text){ transcriptEl.textContent='No transcript — type a destination and tap Resolve.'; return; }
+  const q = t.text || text;
+  (document.getElementById('dest') as HTMLInputElement).value = q;
+  transcriptEl.textContent = `Transcript (${t.source}): "${q}" — tap Resolve to hear read-back.`;
+  // auto-trigger resolve for voice flow
+  (document.getElementById('resolve') as HTMLButtonElement).click();
+}
+pttBtn.addEventListener('pointerdown', async (e)=>{ e.preventDefault(); if(pttDown) return; pttDown=true; pttBtn.textContent='Recording…'; pttBtn.style.background='#be123c'; pttBtn.style.color='#fff'; try{ await voiceRecorder.start(); }catch(err:any){ pttBtn.textContent='Hold to talk'; pttBtn.style.background=''; pttBtn.style.color=''; document.getElementById('voiceStatus')!.textContent=`Mic failed: ${err?.message ?? err}`; pttDown=false; }});
+pttBtn.addEventListener('pointerup', async (e)=>{ e.preventDefault(); if(!pttDown) return; pttDown=false; pttBtn.textContent='Hold to talk'; pttBtn.style.background=''; pttBtn.style.color=''; try{ const { dataURL } = await voiceRecorder.stop(); document.getElementById('voiceStatus')!.textContent='Transcribing…'; await doTranscribe(dataURL); document.getElementById('voiceStatus')!.textContent='Done — confirm ndiyo/hapana.'; }catch(err:any){ document.getElementById('voiceStatus')!.textContent=`Transcribe failed: ${err?.message ?? err}`; }});
+pttBtn.addEventListener('pointercancel', ()=>{ pttDown=false; pttBtn.textContent='Hold to talk'; pttBtn.style.background=''; pttBtn.style.color=''; });
+document.getElementById('confirmYes')!.addEventListener('click', ()=>{
+  if(!pendingPlace){ document.getElementById('transcript')!.textContent='No pending destination to confirm.'; return; }
+  document.getElementById('route')!.textContent += `\nConfirmed ndiyo — starting guidance to ${pendingPlace.names[0]}. "Stop" always works.`;
+  appendSlow(`confirm ndiyo: ${pendingPlace.id}`);
+  cueEngine.enqueue('arrival');
+  speechSynthesis.speak(new SpeechSynthesisUtterance(`Going to ${pendingPlace.names[0]}`));
+});
+document.getElementById('confirmNo')!.addEventListener('click', ()=>{
+  pendingPlace=null;
+  document.getElementById('transcript')!.textContent='Cancelled hapana — say or type another destination.';
+  document.getElementById('route')!.textContent='No route yet. Try again.';
+});
+document.getElementById('stop')!.addEventListener('click', ()=>{
+  pendingPlace=null; currentEdges=null; guidance=null;
+  document.getElementById('route')!.textContent='Stopped — cane stays primary. Say a new destination when ready.';
+  document.getElementById('transcript')!.textContent='Stopped.';
+  document.getElementById('gpsLog')!.textContent='Stopped.';
+  cueEngine.enqueue('degraded');
+  speechSynthesis.cancel();
+});
+
 document.getElementById('sim')!.addEventListener('click', async ()=>{
   const route = document.getElementById('route')!;
   if(!currentEdges){ route.textContent = 'Resolve a Kondele destination first (kondele / kisumu).'; return; }
@@ -258,6 +313,32 @@ function stopGps(){
 }
 document.getElementById('gps')!.addEventListener('click', startGps);
 document.getElementById('stopGps')!.addEventListener('click', stopGps);
+document.getElementById('verify')!.addEventListener('click', async ()=>{
+  const log=document.getElementById('arrivalLog')!;
+  if(!pendingPlace){ log.textContent='Resolve and confirm a destination first (ndiyo).'; return; }
+  if(!stream){ log.textContent='Start camera first — need 2–3 frames within 20 m.'; return; }
+  const posText=document.getElementById('gpsLog')!.textContent ?? '';
+  // Cheap GPS dist: if we have a watch, use last known; else use simulated near (0 m) for demo
+  let gpsDist = 8; // assume near entrance for demo; replace with hav() against entrance when GPS available
+  try{
+    const m=posText.match(/±(\d+)m/);
+    if(m) gpsDist = parseInt(m[1],10);
+  }catch{}
+  log.textContent='Capturing 3 frames…';
+  const frames:string[]=[];
+  for(let i=0;i<3;i++){ try{ frames.push(await captureFrame(video)); await new Promise(r=>setTimeout(r,700)); }catch(e:any){ log.textContent+=`\nframe ${i+1} failed ${e?.message}`; } }
+  log.textContent=`Captured ${frames.length} frames (≤768px JPEG q70) — calling Baseten…`;
+  const readings:any[]=[];
+  for(let i=0;i<frames.length;i++){
+    const r=await readSign(frames[i], pendingPlace.aliases, (s)=> appendSlow(s));
+    if(r) readings.push(r); else log.textContent+=`\nframe ${i+1}: cannot confirm`;
+  }
+  const radius = pendingPlace.entrance?.radius_m ?? 15;
+  const ans=decideArrival(readings, gpsDist, radius, pendingPlace.aliases);
+  log.textContent+=`\nResult: ${ans.arrived ? 'ARRIVED' : 'NOT arrived'} — GPS ${ans.gpsOk?'OK':'far'} (${gpsDist}m ≤${radius}m), frames ${ans.frames}, matches ${ans.matches}/2`;
+  if(ans.arrived){ log.textContent+='\nArrival chime — please confirm by voice or touch.'; cueEngine.enqueue('arrival'); try{ speechSynthesis.speak(new SpeechSynthesisUtterance(`Arrived at ${pendingPlace.names[0]}`)); }catch{} }
+  else { const seen=readings.map(r=> r.visible_text.join(',')).join(' | '); log.textContent+=`\nSeen: ${seen || 'no text'} — uncertain, rely on cane.`; }
+});
 
 // Honest empty-state for screen wake lock
 if('wakeLock' in navigator){

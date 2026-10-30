@@ -1,0 +1,32 @@
+# Env and secrets
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+dist/
+build/
+*.log
+
+# Handoff and private docs (not part of deliverable)
+Downloads/
+Cane Companion Implementation Handoff.md
+
+# Raw media - never commit video/audio
+data/raw/
+data/clips/*.mp4
+data/clips/*.mov
+data/clips/*.wav
+*.mp4
+*.mov
+*.wav
+!eval/fixtures/**
+
+# Local tooling
+.vscode/
+.idea/

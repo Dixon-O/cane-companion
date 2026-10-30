@@ -1,0 +1,72 @@
+{
+  "generated": "2026-10-30T10:31:23.976Z",
+  "pass": 13,
+  "total": 13,
+  "results": [
+    {
+      "name": "gazetteer \"kondele\"",
+      "pass": true,
+      "detail": "got kondele-market expect kondele-market score 1.00"
+    },
+    {
+      "name": "gazetteer \"soko la kondele\"",
+      "pass": true,
+      "detail": "got kondele-market expect kondele-market score 1.00"
+    },
+    {
+      "name": "gazetteer \"kisumu\"",
+      "pass": true,
+      "detail": "got kisumu-main expect kisumu-main score 1.00"
+    },
+    {
+      "name": "gazetteer \"nai\"",
+      "pass": true,
+      "detail": "got nairobi-nai expect nairobi-nai score 1.00"
+    },
+    {
+      "name": "gazetteer \"bondo\"",
+      "pass": true,
+      "detail": "got bondo-siaya expect bondo-siaya score 1.00"
+    },
+    {
+      "name": "gazetteer \"kondele market\"",
+      "pass": true,
+      "detail": "got kondele-market expect kondele-market score 1.00"
+    },
+    {
+      "name": "gazetteer \"unknown place xyz\"",
+      "pass": true,
+      "detail": "got null expect null score -"
+    },
+    {
+      "name": "route A->B (Kondele market)",
+      "pass": true,
+      "detail": "cost 35 reasons no crossings,no open drains,landmark-rich dist 65m"
+    },
+    {
+      "name": "route A->C (Kisumu) avoids drain",
+      "pass": true,
+      "detail": "A-B B-C"
+    },
+    {
+      "name": "route A->D is hazardous",
+      "pass": true,
+      "detail": "h 1"
+    },
+    {
+      "name": "arrival 3/3 close GPS → arrived",
+      "pass": true,
+      "detail": "matches 3/2 gpsOk true"
+    },
+    {
+      "name": "arrival 1/3 close GPS → not arrived",
+      "pass": true,
+      "detail": "matches 1/2"
+    },
+    {
+      "name": "arrival 3/3 far GPS → not arrived",
+      "pass": true,
+      "detail": "gpsOk false matches 3"
+    }
+  ]
+}

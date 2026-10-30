@@ -17,7 +17,7 @@ function lev(a:string,b:string){
 function tokenScore(qTok:string[], candTok:string[]){
   let s=0;
   for(const qt of qTok) {
-    let best=1;
+    let best=0;
     for(const ct of candTok) {
       const d=lev(qt,ct), max=Math.max(qt.length,ct.length);
       const sim = max? 1 - d/max : 1;

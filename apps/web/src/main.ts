@@ -1,4 +1,6 @@
 import './style.css';
+import { createDetector, latencyStats, type Detection } from './safety/detector';
+import { CueEngine } from './safety/cue';
 
 type Hud = { text: string; tone: 'idle'|'ok'|'warn'|'danger' };
 
@@ -11,21 +13,24 @@ app.innerHTML = `
         <div class="brand">Cane Companion — chest harness preview</div>
         <div class="muted">Camera forward · open-ear audio · cane stays primary</div>
       </div>
-      <div class="badge">Indie · Kondele</div>
+      <div class="badge">Indie · Kondele · L1</div>
     </div>
 
     <div class="grid">
       <div class="card">
-        <h2>Camera — safety loop preview</h2>
-        <div class="video"><video id="cam" autoplay playsinline muted></video></div>
+        <h2>Camera — safety loop L1 (on-device)</h2>
+        <div class="video" style="position:relative"><video id="cam" autoplay playsinline muted></video><canvas id="overlay" style="position:absolute;inset:0;width:100%;height:100%"></canvas></div>
         <div class="controls">
           <button id="startCam" class="btn primary">Start camera</button>
           <button id="stopCam" class="btn">Stop</button>
+          <button id="detToggle" class="btn">Load detector</button>
           <button id="ping" class="btn">Test cue</button>
           <span id="camStatus" class="status muted">Idle — allow camera on chest mount.</span>
         </div>
-        <p class="muted">On-device hazard loop runs here (no network). Slow-loop model calls only at events: destination, route, arrival. Section 7: lower band = approaching, upper band = head-height.</p>
+        <div class="row" style="margin-top:8px"><span id="lat" class="pill">lat p50 — p95 —</span><span id="fps" class="pill">fps —</span><span id="budget" class="pill">cues 0/6 per min</span></div>
+        <p class="muted">L1: EfficientDet-Lite0 via MediaPipe (WebGPU → WASM). Corridor ROI central 60%, proximity from box height + growth, panned cues. No network in loop.</p>
         <div id="hud" class="pill">HUD: idle</div>
+        <div id="detLog" class="log" style="margin-top:8px">Detector idle — tap Load detector, then Start camera on the 2510DRA23E.</div>
       </div>
 
       <div class="card">
@@ -62,36 +67,24 @@ app.innerHTML = `
 `;
 
 const video = document.getElementById('cam') as HTMLVideoElement;
+const overlay = document.getElementById('overlay') as HTMLCanvasElement;
 const camStatus = document.getElementById('camStatus')!;
 const hud = document.getElementById('hud')!;
 const slowLog = document.getElementById('slowLog')!;
+const detLog = document.getElementById('detLog')!;
+const latPill = document.getElementById('lat')!;
+const fpsPill = document.getElementById('fps')!;
+const budgetPill = document.getElementById('budget')!;
 let stream: MediaStream | null = null;
 let cueCtx: AudioContext | null = null;
 let gpsWatch: number | null = null;
+let detector: any = null;
+let raf = 0;
+let frames = 0, lastFpsAt = performance.now();
 
 function setHud(h: Hud){
   hud.textContent = `HUD: ${h.text}`;
   hud.style.borderColor = h.tone==='danger' ? '#be123c' : h.tone==='warn' ? '#b45309' : h.tone==='ok' ? '#0f766e' : '#e2e8f0';
-}
-
-async function startCam(){
-  try{
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment', width:{ideal:1280}, height:{ideal:720} }, audio: false });
-    video.srcObject = stream;
-    camStatus.textContent = `Camera on — ${stream.getVideoTracks()[0]?.label ?? 'environment'}`;
-    setHud({ text:'camera on · corridor ROI active (stub)', tone:'ok'});
-    appendSlow(`camera: started ${new Date().toISOString()}`);
-  }catch(e:any){
-    camStatus.textContent = `Camera failed: ${e?.message ?? e}`;
-    setHud({ text:'camera blocked — check permission', tone:'warn'});
-  }
-}
-function stopCam(){
-  stream?.getTracks().forEach(t=>t.stop());
-  stream=null;
-  video.srcObject=null;
-  camStatus.textContent='Camera stopped';
-  setHud({ text:'idle', tone:'idle'});
 }
 
 function ensureAudio(){
@@ -99,32 +92,96 @@ function ensureAudio(){
   if(cueCtx.state==='suspended') cueCtx.resume();
   return cueCtx!;
 }
-function cue(kind:'tick'|'chirp'|'pulse'){
-  const ctx = ensureAudio();
-  const o = ctx.createOscillator();
-  const g = ctx.createGain();
-  const p = ctx.createStereoPanner();
-  o.type = 'sine';
-  o.frequency.value = kind==='chirp' ? 1200 : kind==='pulse' ? 180 : 800;
-  p.pan.value = kind==='chirp' ? 0.6 : -0.2;
-  g.gain.value = 0.0001;
-  o.connect(p).connect(g).connect(ctx.destination);
-  const t = ctx.currentTime;
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.linearRampToValueAtTime(0.2, t+0.02);
-  g.gain.exponentialRampToValueAtTime(0.01, t+0.22);
-  o.start(t); o.stop(t+0.24);
-  setHud({ text:`cue: ${kind}`, tone: kind==='chirp' ? 'warn' : 'ok'});
-}
+const cueEngine = new CueEngine((t)=> setHud({ text:t, tone: t.includes('approaching')||t.includes('head')?'warn':'ok'}), ensureAudio);
 
 function appendSlow(s:string){
   slowLog.textContent = (slowLog.textContent?.startsWith('No calls') ? '' : slowLog.textContent + '\n') + s;
   slowLog.scrollTop = slowLog.scrollHeight;
 }
+function appendDet(s:string){
+  detLog.textContent = (detLog.textContent?.startsWith('Detector idle') ? '' : detLog.textContent + '\n') + s;
+  detLog.scrollTop = detLog.scrollHeight;
+}
+
+async function startCam(){
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment', width:{ideal:1280}, height:{ideal:720} }, audio: false });
+    video.srcObject = stream;
+    await video.play();
+    camStatus.textContent = `Camera on — ${stream.getVideoTracks()[0]?.label ?? 'environment'}`;
+    setHud({ text:'camera on', tone:'ok'});
+    appendSlow(`camera: started ${new Date().toISOString()}`);
+    if(detector?.ready) loop();
+  }catch(e:any){
+    camStatus.textContent = `Camera failed: ${e?.message ?? e}`;
+    setHud({ text:'camera blocked — check permission', tone:'warn'});
+  }
+}
+function stopCam(){
+  cancelAnimationFrame(raf);
+  stream?.getTracks().forEach(t=>t.stop());
+  stream=null;
+  video.srcObject=null;
+  camStatus.textContent='Camera stopped';
+  setHud({ text:'idle', tone:'idle'});
+}
+
+function draw(dets: Detection[]){
+  const c = overlay.getContext('2d')!;
+  const w = overlay.width = video.videoWidth || 640;
+  const h = overlay.height = video.videoHeight || 480;
+  c.clearRect(0,0,w,h);
+  // corridor
+  c.strokeStyle='rgba(15,118,110,0.5)'; c.lineWidth=2; c.setLineDash([6,4]);
+  c.strokeRect(w*0.20, h*0.25, w*0.60, h*0.70);
+  c.setLineDash([]);
+  for(const d of dets){
+    const x=d.bbox.x*w, y=d.bbox.y*h, ww=d.bbox.w*w, hh=d.bbox.h*h;
+    c.strokeStyle = d.proximity==='close' ? '#be123c' : d.proximity==='mid' ? '#b45309' : '#0f766e';
+    c.lineWidth=2; c.strokeRect(x,y,ww,hh);
+    c.fillStyle='rgba(0,0,0,0.6)'; c.fillRect(x, Math.max(0,y-16), 110, 14);
+    c.fillStyle='#fff'; c.font='11px ui-monospace,monospace';
+    c.fillText(`${d.label} ${d.proximity}${d.isApproaching?' ↗':''}`, x+2, y-4);
+  }
+}
+
+async function loop(){
+  if(!detector?.ready || !stream) return;
+  const dets = await detector.detect(video);
+  draw(dets);
+  frames++;
+  const now = performance.now();
+  if(now - lastFpsAt > 1000){
+    const fps = Math.round(frames*1000/(now-lastFpsAt));
+    fpsPill.textContent = `fps ${fps}`;
+    frames=0; lastFpsAt=now;
+    const s = latencyStats(detector.latencyMs);
+    latPill.textContent = `lat p50 ${s.p50} p95 ${s.p95} mean ${s.mean} n=${s.n}`;
+    budgetPill.textContent = `cues budget ${cueEngine['times']?.length ?? 0}/6 per min`;
+  }
+  for(const d of dets){
+    if(d.label==='person' && d.proximity!=='far') cueEngine.enqueue('person-ahead', { side:d.position });
+    if(['car','bus','truck','motorcycle'].includes(d.label) && (d.proximity==='close' || d.isApproaching)) cueEngine.enqueue('approaching-vehicle', { side:d.position });
+  }
+  if(dets.length>0) appendDet(`${new Date().toISOString().slice(11,19)} ${(dets as Detection[]).map((d: Detection)=>`${d.label}:${d.position}:${d.proximity}${d.isApproaching?'↗':''}`).join(' | ')} | p50 ${latencyStats(detector.latencyMs).p50}ms`);
+  raf = requestAnimationFrame(loop);
+}
 
 document.getElementById('startCam')!.addEventListener('click', startCam);
 document.getElementById('stopCam')!.addEventListener('click', stopCam);
-document.getElementById('ping')!.addEventListener('click', ()=> cue('chirp'));
+document.getElementById('ping')!.addEventListener('click', ()=> cueEngine.enqueue('head-height', {side:'right'}));
+document.getElementById('detToggle')!.addEventListener('click', async ()=>{
+  const btn = document.getElementById('detToggle') as HTMLButtonElement;
+  if(detector?.ready){ appendDet('detector already ready'); if(stream) loop(); return; }
+  btn.disabled=true; btn.textContent='Loading…';
+  try{
+    appendDet('loading detector… (first load ~8–12 MB, cached by SW)');
+    detector = await createDetector(appendDet);
+    btn.textContent='Detector ready';
+    appendDet(`ready — delegate ${detector.ready?'ok':'unknown'} — start camera to benchmark on 2510DRA23E`);
+    if(stream) loop();
+  }catch(e:any){ btn.disabled=false; btn.textContent='Load detector'; appendDet(`load failed: ${e?.message ?? e}`); }
+});
 
 document.getElementById('resolve')!.addEventListener('click', async ()=>{
   const q = (document.getElementById('dest') as HTMLInputElement).value.trim();
@@ -132,7 +189,7 @@ document.getElementById('resolve')!.addEventListener('click', async ()=>{
   const route = document.getElementById('route')!;
   route.textContent = `Resolving "${q}" against gazetteer… (Kisumu/Kondele/Nai/Bondo)\nWould call /resolve → read-back → confirm ndiyo/hapana — stub in this slice.`;
   appendSlow(`resolve stub: query="${q}" — would call Baseten tool resolve_place (see eval/smoke-baseten.mjs)`);
-  cue('tick');
+  cueEngine.enqueue('person-ahead');
 });
 
 function startGps(){

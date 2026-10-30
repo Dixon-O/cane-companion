@@ -7,6 +7,7 @@ import { GuidanceEngine } from './routing/guidance';
 import { simulateWalk } from './routing/simulator';
 import { createRecorder, transcribeAudio } from './voice/pushToTalk';
 import { captureFrame, readSign, decideArrival, signReadingSchema } from './slow/arrival';
+import { assessFrame, shouldAnnounce } from './safety/quality';
 
 type Hud = { text: string; tone: 'idle'|'ok'|'warn'|'danger' };
 
@@ -151,20 +152,27 @@ function draw(dets: Detection[]){
   // corridor
   c.strokeStyle='rgba(15,118,110,0.5)'; c.lineWidth=2; c.setLineDash([6,4]);
   c.strokeRect(w*0.20, h*0.25, w*0.60, h*0.70);
+  // head-height band (L2): upper 30% of corridor — chest mount tilt
+  c.strokeStyle='rgba(180,83,9,0.55)'; c.setLineDash([4,4]);
+  c.strokeRect(w*0.20, h*0.25, w*0.60, h*0.18);
   c.setLineDash([]);
   for(const d of dets){
+    const isHead = d.bbox.y < 0.43; // upper band
     const x=d.bbox.x*w, y=d.bbox.y*h, ww=d.bbox.w*w, hh=d.bbox.h*h;
-    c.strokeStyle = d.proximity==='close' ? '#be123c' : d.proximity==='mid' ? '#b45309' : '#0f766e';
-    c.lineWidth=2; c.strokeRect(x,y,ww,hh);
-    c.fillStyle='rgba(0,0,0,0.6)'; c.fillRect(x, Math.max(0,y-16), 110, 14);
+    c.strokeStyle = isHead ? '#b45309' : d.proximity==='close' ? '#be123c' : d.proximity==='mid' ? '#b45309' : '#0f766e';
+    c.lineWidth = isHead ? 3 : 2; c.strokeRect(x,y,ww,hh);
+    c.fillStyle='rgba(0,0,0,0.6)'; c.fillRect(x, Math.max(0,y-16), 140, 14);
     c.fillStyle='#fff'; c.font='11px ui-monospace,monospace';
-    c.fillText(`${d.label} ${d.proximity}${d.isApproaching?' ↗':''}`, x+2, y-4);
+    c.fillText(`${d.label} ${d.proximity}${d.isApproaching?' ↗':''}${isHead?' head':''}`, x+2, y-4);
   }
 }
 
+let lastQualityCheck=0;
 async function loop(){
   if(!detector?.ready || !stream) return;
   const dets = await detector.detect(video);
+  // L2 head-height: upper band flag
+  const headDets = dets.filter((d: Detection)=> d.bbox.y < 0.43 && d.bbox.y + d.bbox.h > 0.25);
   draw(dets);
   frames++;
   const now = performance.now();
@@ -176,11 +184,25 @@ async function loop(){
     latPill.textContent = `lat p50 ${s.p50} p95 ${s.p95} mean ${s.mean} n=${s.n}`;
     budgetPill.textContent = `cues budget ${cueEngine['times']?.length ?? 0}/6 per min`;
   }
+  // degraded monitor ~every 800ms on canvas
+  if(now - lastQualityCheck > 800){
+    lastQualityCheck=now;
+    try{
+      const qs = assessFrame(overlay);
+      (document.getElementById('camStatus') as HTMLElement).textContent = qs.quality==='degraded' ? `Degraded: ${qs.reason} (b${qs.brightness} blur${qs.blur}) — rely on cane` : `Camera on — b${qs.brightness} blur${qs.blur}`;
+      if(shouldAnnounce(qs)){
+        cueEngine.enqueue('degraded');
+        appendDet(`degraded: ${qs.reason} b${qs.brightness} blur${qs.blur} — announced once, 30s cooldown`);
+        try{ speechSynthesis.speak(new SpeechSynthesisUtterance('Vision degraded, rely on cane')); }catch{}
+      }
+    }catch{}
+  }
   for(const d of dets){
     if(d.label==='person' && d.proximity!=='far') cueEngine.enqueue('person-ahead', { side:d.position });
     if(['car','bus','truck','motorcycle'].includes(d.label) && (d.proximity==='close' || d.isApproaching)) cueEngine.enqueue('approaching-vehicle', { side:d.position });
   }
-  if(dets.length>0) appendDet(`${new Date().toISOString().slice(11,19)} ${(dets as Detection[]).map((d: Detection)=>`${d.label}:${d.position}:${d.proximity}${d.isApproaching?'↗':''}`).join(' | ')} | p50 ${latencyStats(detector.latencyMs).p50}ms`);
+  for(const h of headDets){ cueEngine.enqueue('head-height', { side:h.position }); }
+  if(dets.length>0 || headDets.length>0) appendDet(`${new Date().toISOString().slice(11,19)} ${(dets as Detection[]).map((d: Detection)=>`${d.label}:${d.position}:${d.proximity}${d.isApproaching?'↗':''}${d.bbox.y<0.43?' head':''}`).join(' | ')} | p50 ${latencyStats(detector.latencyMs).p50}ms`);
   raf = requestAnimationFrame(loop);
 }
 

@@ -1,6 +1,10 @@
 import './style.css';
 import { createDetector, latencyStats, type Detection } from './safety/detector';
 import { CueEngine } from './safety/cue';
+import { resolvePlace } from './routing/gazetteer';
+import { dijkstra, NODES } from './routing/graph';
+import { GuidanceEngine } from './routing/guidance';
+import { simulateWalk } from './routing/simulator';
 
 type Hud = { text: string; tone: 'idle'|'ok'|'warn'|'danger' };
 
@@ -38,9 +42,10 @@ app.innerHTML = `
         <div class="row">
           <input id="dest" placeholder="Say: Kondele market" style="flex:1;min-width:160px;padding:10px;border:1px solid #e2e8f0;border-radius:10px" />
           <button id="resolve" class="btn">Resolve</button>
+          <button id="sim" class="btn">Simulate walk</button>
         </div>
-        <p class="muted">Fuzzy match against <span class="kbd">data/gazetteer.json</span> (Kisumu, Kondele, Nai, Bondo) then read-back before start. Future cheap device: same engine with ultrasonic + lidar + camera.</p>
-        <div id="route" class="log">No route yet.</div>
+        <p class="muted">Fuzzy (token + lev + phonetic) vs <span class="kbd">data/gazetteer.json</span> (Kisumu, Kondele, Nai, Bondo) → read-back <span class="kbd">ndiyo/hapana</span> → graph Dijkstra (cost = dist + crossings + hazard − landmark). Future cheap device: same engine with ultrasonic + lidar + camera.</p>
+        <div id="route" class="log">No route yet. Try: "kondele", "kisumu", "nai", "bondo", "soko la kondele".</div>
 
         <h2 style="margin-top:14px">GPS · Guidance</h2>
         <div class="row">
@@ -183,13 +188,56 @@ document.getElementById('detToggle')!.addEventListener('click', async ()=>{
   }catch(e:any){ btn.disabled=false; btn.textContent='Load detector'; appendDet(`load failed: ${e?.message ?? e}`); }
 });
 
+let currentEdges: any = null;
+let guidance: any = null;
 document.getElementById('resolve')!.addEventListener('click', async ()=>{
   const q = (document.getElementById('dest') as HTMLInputElement).value.trim();
   if(!q) return;
   const route = document.getElementById('route')!;
-  route.textContent = `Resolving "${q}" against gazetteer… (Kisumu/Kondele/Nai/Bondo)\nWould call /resolve → read-back → confirm ndiyo/hapana — stub in this slice.`;
-  appendSlow(`resolve stub: query="${q}" — would call Baseten tool resolve_place (see eval/smoke-baseten.mjs)`);
+  const { result, alternatives } = resolvePlace(q);
+  if(!result){
+    const alts = alternatives.map(a=> `${a.place.names[0]} (${a.score.toFixed(2)})`).join(' or ');
+    route.textContent = `No confident match for "${q}".` + (alts ? ` Did you mean: ${alts}?` : '') + `\nTry: kondele / kisumu / nai / bondo / soko la kondele`;
+    appendSlow(`resolve miss: "${q}" alts=${alts}`);
+    cueEngine.enqueue('head-height');
+    return;
+  }
+  route.textContent = `Heard "${q}" → "${result.place.names[0]}" (score ${result.score.toFixed(2)}) alias "${result.alias}"\nRead-back: "Go to ${result.place.names[0]}?" — say ndiyo/hapana (yes/no).`;
+  appendSlow(`resolve hit: "${q}" → ${result.place.id} score ${result.score.toFixed(2)} — would call Baseten resolve_place check`);
+  // Map place to graph node for demo route (Kondele graph only — Nairobi/Bondo are alias-only per DECISIONS)
+  const map: Record<string,string> = { 'kondele-market':'B', 'kisumu-main':'C' };
+  const destNode = map[result.place.id];
+  if(!destNode){
+    route.textContent += `\nNo walking graph for ${result.place.names[0]} — not on Kondele demo route (alias test only). Add its entrance + OSM extract to extend.`;
+    return;
+  }
+  const startNode = 'A'; // Kondele west — in production: nearest to GPS
+  const res = dijkstra(startNode, destNode);
+  if(!res){ route.textContent += `\nNo route from ${startNode} to ${destNode}`; return; }
+  currentEdges = res.edges;
+  guidance = new GuidanceEngine(currentEdges);
+  route.textContent += `\nRoute ${startNode}→${destNode}: ${res.edges.map(e=>e.from+'-'+e.to).join(' → ')} — ${res.totalDistM} m — ${res.reasons.join(', ')} — cost ${Math.round(res.cost)}`;
+  route.textContent += `\nTap Simulate walk to replay GPS trace through guidance (snap + turn cue).`;
   cueEngine.enqueue('person-ahead');
+});
+document.getElementById('sim')!.addEventListener('click', async ()=>{
+  const route = document.getElementById('route')!;
+  if(!currentEdges){ route.textContent = 'Resolve a Kondele destination first (kondele / kisumu).'; return; }
+  route.textContent += `\nSimulating walk…`;
+  const gpsLog = document.getElementById('gpsLog')!;
+  let steps=0;
+  for(const pt of simulateWalk(currentEdges, { stepM:2, jitterM:1.5 })){
+    guidance.update({ lat:pt.lat, lon:pt.lon, heading:pt.heading }, (msg:string)=> gpsLog.textContent = msg + `\nlat ${pt.lat.toFixed(5)} lon ${pt.lon.toFixed(5)} edge ${pt.edgeId}`);
+    // turn cue at start of each edge
+    if(steps % 18 === 0){
+      const last = currentEdges[Math.floor(steps/18)];
+      if(last) cueEngine.enqueue(steps%36===0?'turn-left':'turn-right');
+    }
+    steps++;
+    await new Promise(r=> setTimeout(r, 90));
+    if(steps>120) break;
+  }
+  gpsLog.textContent += `\nSim done — ${steps} points. Arrival check: deterministic isArrived(GPS≤radius + 2/3 frames with text match) — see packages/shared.`;
 });
 
 function startGps(){

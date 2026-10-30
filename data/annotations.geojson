@@ -1,0 +1,31 @@
+{
+  "type": "FeatureCollection",
+  "attribution": "Builder survey — Kondele ~1 km² (hand-annotated per Section 8)",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "kind": "crossing", "note": "Unsignalized crossing near Kondele market" },
+      "geometry": { "type": "Point", "coordinates": [34.7681, -0.0916] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "kind": "open_drain", "hazard": true },
+      "geometry": { "type": "LineString", "coordinates": [[34.7678, -0.0914], [34.7682, -0.0913]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "kind": "steps", "hazard": true, "count": 3 },
+      "geometry": { "type": "Point", "coordinates": [34.7683, -0.0915] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "kind": "landmark", "name": "Shop with red sign", "side": "right" },
+      "geometry": { "type": "Point", "coordinates": [34.7680, -0.0917] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "kind": "missing_pavement", "hazard": true },
+      "geometry": { "type": "LineString", "coordinates": [[34.7679, -0.0918], [34.7680, -0.0919]] }
+    }
+  ]
+}

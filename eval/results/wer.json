@@ -1,0 +1,7 @@
+{
+  "pending": true,
+  "total": 8,
+  "pendingCount": 8,
+  "message": "8/8 phrases still need audio (record 50+ phrases, 3+ speakers, English/Swahili/code-mixed per Section 4). Run with transcripts map to compute WER. Gate threshold 15%.",
+  "wer": null
+}

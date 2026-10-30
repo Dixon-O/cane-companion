@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "note": "WER test set stub — record 50+ phrases, 3+ speakers, English/Swahili/code-mixed per Section 4. Fill audio field with data URL or path (not committed raw). WER gate 15%.",
+  "phrases": [
+    { "id": "p01", "text": "Kondele market", "lang": "en", "audio": null },
+    { "id": "p02", "text": "Soko la Kondele", "lang": "sw", "audio": null },
+    { "id": "p03", "text": "Kisumu", "lang": "en", "audio": null },
+    { "id": "p04", "text": "Nai", "lang": "sheng", "audio": null },
+    { "id": "p05", "text": "Bondo", "lang": "en", "audio": null },
+    { "id": "p06", "text": "Take me to Kondele", "lang": "en", "audio": null },
+    { "id": "p07", "text": "Nipeleke Kisumu", "lang": "sw", "audio": null },
+    { "id": "p08", "text": "Nipeleke Nai", "lang": "sw-mixed", "audio": null }
+  ],
+  "gate": { "threshold": 0.15, "action": "If WER >15%: load gazetteer aliases as keyword/context biasing → re-measure. If still >15% consider fine-tune (Modal unavailable — skip). Record in docs/DECISIONS.md." }
+}

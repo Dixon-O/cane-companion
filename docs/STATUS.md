@@ -8,16 +8,16 @@ Repo: `https://github.com/Dixon-O/cane-companion.git` (empty before this slice, 
 
 | Day | Goal (handoff) | Status | Notes |
 | --- | --- | --- | --- |
-| Oct 27 | Repo public + MIT, PWA skeleton with camera/mic/GPS, hello-world to both providers, cost logger, Day-1 unknowns, builder answers | Partial | Repo cloned empty, now scaffolding in this slice. Builder answers done. Hello-world calls and cost logger not yet run. PWA skeleton missing. |
-| Oct 28 | Safety loop L1, audio cues, latency instrumentation, data capture #1 | Missing | L1 detector, cue engine, instrumentation not built. No capture yet. |
-| Oct 29 | Routing, gazetteer, guidance engine, GPS-trace simulator | Missing | Graph search, gazetteer, snap/replan not built. |
-| Oct 30 (re-baselined) | Status audit; Baseten smoke tests; finish missing L1/cue/routing/guidance; start destination voice | In progress | This file is the audit. Smoke tests next (needs `BASETEN_API_KEY` in env). |
+| Oct 27 | Repo public + MIT, PWA skeleton with camera/mic/GPS, hello-world to both providers, cost logger, Day-1 unknowns, builder answers | Partial | Repo at `6513673` on `main` with MIT, `.env.example`, scaffold. Builder answers + Android 16 `BP2A.250605.031.A3` on 2510DRA23E recorded. Baseten hello-world passed (text 200, 3217 ms, $0.0032) and tool call passed. PWA skeleton + preview deploy still missing. Cost logger in smoke harness (tokens/cost per call). |
+| Oct 28 | Safety loop L1, audio cues, latency instrumentation, data capture #1 | Missing | L1 detector, cue engine, Web Audio + StereoPanner, latency instrumentation not built. No Kondele capture yet. |
+| Oct 29 | Routing, gazetteer, guidance engine, GPS-trace simulator | Missing | Graph search, gazetteer, snap/replan, `data/gazetteer.json` not built. |
+| Oct 30 (re-baselined) | Status audit; Baseten smoke tests; finish missing L1/cue/routing/guidance; start destination voice | Partial | Audit done, 5 smoke checks run: text/tool pass, image base64 pass after fixing padding, audio transport pass but needs real speech fixture, latency p50 2548 ms p95 3217 ms, cached_tokens verified. |
 
 ## Baseten blockers & decisions
 
 - Only Baseten provider available (`$100`, model `meta-models/muse-spark-open-1026`). Modal and Fireworks unavailable — skip second-provider comparison and fine-tune unless WER gate forces a rethink.
-- Phone for benchmarks: Xiaomi Redmi Note 15 (Android version TBD — confirm on device, Section 7).
-- Demo area: Kondele, Kisumu (~1 km² to survey). Gazetteer destinations: Kondele (local), Kisumu, Nairobi alias "Nai", Bondo (Siaya). Routing demo stays inside Kondele; distant names are in gazetteer for alias/fuzzy-match testing only — not city-wide routing.
+- Phone for benchmarks: Xiaomi 2510DRA23E, Android 16 `BP2A.250605.031.A3` (Oct 30).
+- Demo area: Kondele, Kisumu (~1 km² to survey). Gazetteer destinations: Kisumu, Kondele, Nairobi alias "Nai", Bondo (Siaya). Routing demo stays inside Kondele; distant names are gazetteer alias tests only.
 
 ## Next in re-baselined order
 

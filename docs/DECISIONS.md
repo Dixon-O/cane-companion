@@ -4,7 +4,7 @@ All Day-1 unknowns and [BUILDER] answers. Update after each measurement. Follow 
 
 ## Builder answers (2026-10-30)
 
-- **(1) Phone + OS:** Xiaomi Redmi Note 15. Android version TBD — to capture on-device (`Settings → About phone`) and re-record here. Benchmarks in Section 7/4 must be on this device.
+- **(1) Phone + OS:** Xiaomi Redmi Note 15, model **2510DRA23E**, Android **16** `BP2A.250605.031.A3` (confirmed Oct 30). This is the target for all L1/latency/thermal benchmarks (Section 7/4).
 - **(2) Demo area + destinations:** Demo area Kondele, Kisumu (~1 km² to survey on foot, annotations → `data/annotations.geojson`). Gazetteer `data/gazetteer.json` holds: Kisumu, Kondele (local), Nairobi alias "Nai", Bondo (Siaya) with English/Swahili/Sheng aliases and expected sign text. Note: Nairobi/Bondo are included for alias/fuzzy testing; walking demo stays inside Kondele.
 - **(3) Track:** Indie Developer (confirmed).
 - **(4) Blind tester access + consent:** 1 blind contact available. No live-street testing until controlled trials pass with sighted spotter and ideally O&M review (Section 3 #9). For hackathon demo/eval: concept interviews (3–5, cues/audio/route prefs, no street testing) quoted in README/video. Consent + face/plate blur for any recordings; no personal data in repo.
@@ -21,24 +21,29 @@ Goal is affordable access in Kenya; future intent is a cheap wearable with ultra
 
 Record here after each smoke test. Do not claim before measuring.
 
-| # | Question | Result (fill after smoke) |
+| # | Question | Result (measured 2026-10-30) |
 | --- | --- | --- |
-| 1 | Can Muse Spark Open read storefront signs in Nairobi/Kisumu frames? | TBD — smoke (2) |
-| 2 | Does Muse Spark Open handle Kenyan-accented English + Swahili place names (audio_url)? | TBD — smoke (4) |
-| 3 | Does either model support Swahili? | TBD — test both |
-| 4 | Per-call latency from Kenya (p50/p95) + tokens/cost | TBD — smoke (5) |
-| 5 | Rate limits seen (headers + `GET /v1/model_apis/...`) | TBD |
-| 6 | Caching via `x-session-affinity` + `cached_tokens` | TBD |
+| 1 | Can Muse Spark Open read storefront signs in Nairobi/Kisumu frames? | **Partial pass.** Base64 image with correct JPEG (picsum 768×512) returned 200, prompt 641, completion 734, cached 128, cost ~$0.0039, reasoning 710 tokens. Earlier tiny malformed b64 → 400 "Excess data after padding" (fixed). https URL fetch → 400/403 forbidden (host blocked). So base64 path works. Sign-reading fields not yet tested on real Nairobi/Kisumu shopfront — needs recorded street frames from Kondele. |
+| 2 | Does Muse Spark Open handle Kenyan-accented English + Swahili place names (audio_url)? | **Transport pass, content inconclusive.** `audio_url` data URL (silent WAV 0.5s) → 200, prompt 164, completion 583, cached 128, but model reported "no audio" (silent). Public https audio → 400 "Cannot connect to host". Needs real recorded destinations (English/Swahili/code-mixed) from Section 4 test set to measure WER. Gate unchanged: WER 15% with `eval/results.md` card. |
+| 3 | Does either model support Swahili? | **Deferred.** Muse Spark Open via Baseten not tested for Swahili transcription yet (audio fixture missing). Meta Voice Transcribe unavailable (no META_API_KEY). Will test Swahili + code-mixed once fixtures are recorded. |
+| 4 | Per-call latency from Kenya (p50/p95) + tokens/cost | **Measured on home fiber (Kenya):** text p50 ~2548 ms p95 ~3217 ms (n=6: 1980, 2548, 2868, 3217 plus tool 1528, image 1780). Image call ~1280–1800 ms. Typical cost $0.0020–$0.0039 per call. Slow-loop must budget for this — hazard loop stays on-device (Section 3 #3) and slow-loop calls only at events with 5 s timeout + retry + "cannot confirm" fallback. |
+| 5 | Rate limits seen (headers + `GET /v1/model_apis/...`) | No `x-ratelimit-*` headers on chat responses. `GET /v1/model_apis/<slug>` → 403 Permission denied with inference key (needs org key). Will monitor 429/529 + 402 at runtime with backoff. |
+| 6 | Caching via `x-session-affinity` + `cached_tokens` | `x-session-affinity` sent, `usage.prompt_tokens_details.cached_tokens` returned 128 on repeated system-prompt calls (seen on text + audio + second image). Keep system prompt + tool defs identical and first per Section 6. |
 
-## Baseten smoke tests (Section 6, 5 checks)
+## Baseten smoke tests (Section 6, 5 checks) — results 2026-10-30
 
-Run with `BASETEN_API_KEY` in env only (never commit). Record provider, latency, tokens, cost per call. Use timeout 5 s, one retry, "cannot confirm" on failure.
+Run with `BASETEN_API_KEY` in env only (never commit). 5 s timeout, one retry, "cannot confirm" fallback.
 
-1. Text call
-2. One base64 street frame → visible_text
-3. Tool call → `resolve_place` args
-4. `audio_url` with recorded destination (English / Swahili / code-mixed)
-5. Latency p50/p95 from Kenya + tokens per call
+| # | Test | Status | Latency | Usage | Notes |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Text ("Say hello in 5 words") | 200 | 3217 ms | prompt 152 comp 702 cached 128 cost $0.0032 | Reasoning included (702 output). |
+| 2 | Image base64 (tiny malformed) | 400 | 1780 ms | — | "Excess data after padding" — b64 malformed. |
+| 2b | Image base64 (picsum 768×512 valid) | 200 | ~1280–1800 ms | prompt 641 comp 734 cached 128 cost $0.0039 | Describes scene correctly. Confirms base64 path; max 8 images/100 MiB, no PDFs. |
+| 3 | Tool `resolve_place` ("Nai near Kondele market") | 200 | 1528 ms | prompt 651 comp 282 cached 0 cost $0.0020 | Tool call returned `{query:"Nai near Kondele market"}` correctly. |
+| 4 | Audio `audio_url` silent WAV data URL | 200 | 3433 ms | prompt 164 comp 583 cached 128 cost $0.0027 | Model said "no audio" — silent fixture not useful. https URL → 400 cannot fetch. Real speech fixture needed for WER. |
+| 5 | Latency probes (3× text) | 200 | p50 2548 ms p95 3217 ms | 1980, 2548, 2868 ms | Slow-loop must account for ~2.5–3.2 s. Keep reasoning low. |
+
+Spending to date: 7 calls ~$0.019, well under 2000-call dev budget; ≥30% reserve intact.
 
 ## Baseten spec anchors (Oct 30, supersedes earlier basics)
 

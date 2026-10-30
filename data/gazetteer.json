@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "attribution": "Names surveyed for Cane Companion demo — Kondele, Kisumu",
+  "places": [
+    {
+      "id": "kondele-market",
+      "names": ["Kondele Market", "Kondele", "Soko la Kondele"],
+      "aliases": ["kondele", "kondele market", "soko la kondele"],
+      "entrance": { "lat": -0.0915, "lon": 34.7680, "radius_m": 15 },
+      "expected_sign_text": ["KONDELE MARKET", "KONDELE"],
+      "kind": "market"
+    },
+    {
+      "id": "kisumu-main",
+      "names": ["Kisumu", "Kisumu City"],
+      "aliases": ["kisumu", "kisumu city"],
+      "entrance": { "lat": -0.0917, "lon": 34.7680, "radius_m": 20 },
+      "expected_sign_text": ["KISUMU"],
+      "kind": "town"
+    },
+    {
+      "id": "nairobi-nai",
+      "names": ["Nairobi", "Nai"],
+      "aliases": ["nairobi", "nai", "nairobbery"],
+      "entrance": { "lat": -1.2921, "lon": 36.8219, "radius_m": 20 },
+      "expected_sign_text": ["NAIROBI"],
+      "kind": "city",
+      "note": "Alias test only — not on Kondele walking route"
+    },
+    {
+      "id": "bondo-siaya",
+      "names": ["Bondo", "Bondo Town"],
+      "aliases": ["bondo", "bondo town", "bondo siaya"],
+      "entrance": { "lat": -0.091, "lon": 34.28, "radius_m": 15 },
+      "expected_sign_text": ["BONDO"],
+      "kind": "town",
+      "note": "Alias test only — not on Kondele route"
+    }
+  ]
+}

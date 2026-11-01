@@ -6,16 +6,22 @@ Phone worn on a chest harness (camera forward) + open-ear/bone-conduction audio.
 
 Built for Meta Global AI Developer Hackathon (Build for Your World) — Indie track. The cane stays primary.
 
-> Status: foundations (Oct 30). See [docs/STATUS.md](docs/STATUS.md), [docs/DECISIONS.md](docs/DECISIONS.md), [docs/LOG.md](docs/LOG.md).
+> Status: PWA + Capacitor + TWA wrappers (Oct 31). See [docs/STATUS.md](docs/STATUS.md), [docs/DECISIONS.md](docs/DECISIONS.md), [docs/LOG.md](docs/LOG.md), [docs/ANDROID.md](docs/ANDROID.md).
 
-## Quick start (placeholder)
+## Quick start
 
-PWA lives in `apps/web`, API in `services/api`, shared types in `packages/shared`.
+PWA lives in `apps/web` (Capacitor android/ + TWA twa/), API in `services/api`, shared types in `packages/shared`.
 
 ```bash
 cp .env.example .env   # add BASETEN_API_KEY
 npm install
-npm run dev
+npm --prefix apps/web run dev      # PWA at http://localhost:5173
+# Android
+npm --prefix apps/web run android:build  # build + cap copy/sync
+npx --prefix apps/web cap open android   # Android Studio
+# TWA (needs deployed host)
+# bubblewrap init --manifest https://YOUR_HOST/manifest.webmanifest
+# bubblewrap build
 ```
 
 ## Safety

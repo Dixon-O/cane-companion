@@ -30,3 +30,9 @@ data/clips/*.wav
 # Local tooling
 .vscode/
 .idea/
+# Android / signing - never commit keystore
+*.keystore
+*.jks
+apps/web/android/
+twa/android/
+twa/.bubblewrap/

@@ -1,0 +1,35 @@
+{
+  "packageId": "com.dixon.cane.twa",
+  "host": "REPLACE_WITH_DEPLOYED_HOST",
+  "name": "Cane Companion",
+  "launcherName": "Cane",
+  "display": "standalone",
+  "themeColor": "#111827",
+  "navigationColor": "#111827",
+  "backgroundColor": "#ffffff",
+  "startUrl": "/",
+  "iconUrl": "https://REPLACE_WITH_DEPLOYED_HOST/icon-192.png",
+  "maskableIconUrl": null,
+  "manifestUrl": "https://REPLACE_WITH_DEPLOYED_HOST/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": true
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "fullScopeUrl": "https://REPLACE_WITH_DEPLOYED_HOST/",
+  "minSdkVersion": 23,
+  "splashScreenFadeOutDuration": 300,
+  "orientation": "any",
+  "appVersion": "1.0.0",
+  "appVersionCode": 1,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "android"
+  }
+}

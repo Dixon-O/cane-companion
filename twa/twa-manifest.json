@@ -1,6 +1,6 @@
 {
   "packageId": "com.dixon.cane.twa",
-  "host": "REPLACE_WITH_DEPLOYED_HOST",
+  "host": "miracle-taupe.vercel.app",
   "name": "Cane Companion",
   "launcherName": "Cane",
   "display": "standalone",
@@ -8,9 +8,9 @@
   "navigationColor": "#111827",
   "backgroundColor": "#ffffff",
   "startUrl": "/",
-  "iconUrl": "https://REPLACE_WITH_DEPLOYED_HOST/icon-192.png",
+  "iconUrl": "https://miracle-taupe.vercel.app/icon-192.png",
   "maskableIconUrl": null,
-  "manifestUrl": "https://REPLACE_WITH_DEPLOYED_HOST/manifest.webmanifest",
+  "manifestUrl": "https://miracle-taupe.vercel.app/manifest.webmanifest",
   "fallbackType": "customtabs",
   "features": {
     "locationDelegation": {
@@ -22,7 +22,7 @@
   },
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
-  "fullScopeUrl": "https://REPLACE_WITH_DEPLOYED_HOST/",
+  "fullScopeUrl": "https://miracle-taupe.vercel.app/",
   "minSdkVersion": 23,
   "splashScreenFadeOutDuration": 300,
   "orientation": "any",
@@ -31,5 +31,9 @@
   "signingKey": {
     "path": "./android.keystore",
     "alias": "android"
-  }
+  },
+  "webManifestUrl": "https://miracle-taupe.vercel.app/manifest.webmanifest",
+  "fingerprints": [
+    "ab2a68ceaa2a6be49eba0498d152e48e6d4fc2e7c14966a33c421093ce7ee9fe"
+  ]
 }

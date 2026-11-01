@@ -1,10 +1,26 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.dixon.cane.twa",
+      "sha256_cert_fingerprints": [
+        "AB:2A:68:CE:AA:2A:6B:E4:9E:BA:04:98:D1:52:E4:8E:6D:4F:C2:E7:C1:49:66:A3:3C:42:10:93:CE:7E:E9:FE"
+      ]
+    }
+  },
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "com.dixon.cane",
-      "sha256_cert_fingerprints": ["REPLACE_WITH_SHA256_FROM_BUBBLEWRAP"]
+      "sha256_cert_fingerprints": [
+        "AB:2A:68:CE:AA:2A:6B:E4:9E:BA:04:98:D1:52:E4:8E:6D:4F:C2:E7:C1:49:66:A3:3C:42:10:93:CE:7E:E9:FE"
+      ]
     }
   }
 ]
